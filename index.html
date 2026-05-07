@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoCraft Simulator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            animation: {
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+        /* Custom Animation Classes */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        
+        .animate-in { animation-duration: 0.5s; animation-fill-mode: both; animation-timing-function: ease-out; }
+        .fade-in { animation-name: fadeIn; }
+        .zoom-in { animation-name: zoomIn; }
+        .slide-in-from-right-8 { animation-name: slideInRight; }
+    </style>
+
+    <!-- React and Babel via ES Modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.294.0"
+        }
+    }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+          FlaskConical, Layers, Hexagon, ShieldAlert, Zap, 
+          ChevronRight, ChevronLeft, RefreshCcw, Award, Check,
+          Microscope, Sparkles, AlertTriangle, ArrowRight,
+          Magnet, Sun, Droplets, Box, Lightbulb, Hammer, CloudRain, Puzzle,
+          Waves, Leaf, Link, Mountain, Network, Crosshair, Pill, Plus, CircleSlash,
+          Dna, Key, Activity, GitBranch, Camera, Loader2, Image as ImageIcon, Home
+        } from 'lucide-react';
+
+        // --- GAME DATA ---
+        const CATEGORIES = [
+          {
+            id: 'material',
+            title: 'Core Material',
+            description: 'Select the primary building block for your nanoparticle.',
+            icon: Hexagon,
+            options: [
+              { id: 'chitosan_np', name: 'Chitosan', type: 'Organic', desc: 'A natural, biodegradable polysaccharide derived from crustacean shells.', baseValue: 15, icon: Leaf },
+              { id: 'iron_oxide', name: 'Iron Oxide (SPIONs)', type: 'Inorganic', desc: 'Magnetic nanoparticles excellent for MRI contrast and magnetic targeting.', baseValue: 20, icon: Magnet },
+              { id: 'gold_np', name: 'Gold', type: 'Inorganic', desc: 'Highly stable with excellent plasmonic properties for photothermal therapy.', baseValue: 25, icon: Sun },
+              { id: 'liposome', name: 'Liposome', type: 'Organic', desc: 'Spherical vesicles made of lipid bilayers, highly biocompatible.', baseValue: 20, icon: Droplets },
+              { id: 'mesoporous_silica', name: 'Mesoporous Silica', type: 'Inorganic', desc: 'A porous silica network offering massive internal surface area for drug loading.', baseValue: 25, icon: Box },
+              { id: 'quantum_dots', name: 'Quantum Dots', type: 'Inorganic', desc: 'Semiconductor nanocrystals with bright, size-tunable fluorescence.', baseValue: 15, icon: Lightbulb },
+              { id: 'carbon_nanotubes', name: 'Carbon Nanotubes', type: 'Inorganic', desc: 'Cylindrical carbon nanostructures with ultra-high surface area.', baseValue: 10, icon: Layers },
+            ]
+          },
+          {
+            id: 'synthesis',
+            title: 'Synthesis Route',
+            description: 'How will you manufacture these nanoparticles?',
+            icon: Zap,
+            options: [
+              { id: 'milling', name: 'High-Energy Milling', type: 'Top-Down', desc: 'Mechanical crushing of bulk materials into nanoscale particles.', baseValue: 5, icon: Hammer },
+              { id: 'ablation', name: 'Laser Ablation', type: 'Top-Down', desc: 'Using high-power lasers to vaporize bulk material in a liquid.', baseValue: 10, icon: Zap },
+              { id: 'precipitation', name: 'Co-precipitation', type: 'Bottom-Up', desc: 'Precipitating nanoparticles from salt precursors in a controlled solution.', baseValue: 20, icon: CloudRain },
+              { id: 'self_assembly', name: 'Self-Assembly', type: 'Bottom-Up', desc: 'Molecules spontaneously organize into stable nanoscale structures.', baseValue: 25, icon: Puzzle },
+              { id: 'microfluidics', name: 'Microfluidics', type: 'Bottom-Up', desc: 'Continuous flow synthesis in microscopic channels. Incredible consistency.', baseValue: 30, icon: Waves },
+              { id: 'sol_gel', name: 'Sol-Gel Process', type: 'Bottom-Up', desc: 'Transition from a liquid "sol" phase into a solid "gel" phase.', baseValue: 15, icon: FlaskConical },
+              { id: 'green_synthesis', name: 'Green Synthesis', type: 'Bottom-Up', desc: 'Using plant extracts or microbes as reducing agents. Highly eco-friendly.', baseValue: 20, icon: Leaf },
+            ]
+          },
+          {
+            id: 'polymer',
+            title: 'Polymer / Coating',
+            description: 'Select a coating to stabilize the core and prevent aggregation in the bloodstream.',
+            icon: Layers,
+            options: [
+              { id: 'albumin', name: 'Albumin', type: 'Organic (Protein)', desc: 'A natural blood protein that prevents immune clearance and binds to certain tumors.', baseValue: 15, icon: Activity },
+              { id: 'lipids', name: 'Lipids', type: 'Organic (Lipid)', desc: 'Phospholipid bilayer coating that mimics natural cell membranes.', baseValue: 15, icon: Droplets },
+              { id: 'peg', name: 'PEG', type: 'Synthetic', desc: 'Polyethylene glycol. Creates a "stealth" hydration layer to evade macrophages.', baseValue: 20, icon: Link },
+              { id: 'calcium_phosphate', name: 'Calcium Phosphate', type: 'Inorganic Ions', desc: 'A hard, pH-sensitive mineral coating that dissolves in acidic environments.', baseValue: 10, icon: Mountain },
+              { id: 'hyaluronic_acid', name: 'Hyaluronic Acid', type: 'Organic', desc: 'A natural glycosaminoglycan that natively targets CD44 tumor receptors.', baseValue: 25, icon: Network },
+              { id: 'plga', name: 'PLGA', type: 'Synthetic', desc: 'Highly successful FDA-approved biodegradable copolymer.', baseValue: 20, icon: Box },
+              { id: 'dextran', name: 'Dextran', type: 'Organic', desc: 'A complex, branched glucan that offers excellent colloidal stability.', baseValue: 15, icon: GitBranch },
+            ]
+          },
+          {
+            id: 'functionalization',
+            title: 'Functionalization',
+            description: 'Modify the surface to add specific biological functions or targeting capabilities.',
+            icon: FlaskConical,
+            options: [
+              { id: 'antibodies', name: 'Monoclonal Antibodies', type: 'Targeting', desc: 'Proteins that bind precisely to specific receptors on cancer cells.', baseValue: 20, icon: Crosshair },
+              { id: 'doxorubicin', name: 'Doxorubicin', type: 'Therapeutic', desc: 'A potent chemotherapeutic drug loaded into/onto the particle.', baseValue: 15, icon: Pill },
+              { id: 'cationic_amines', name: 'Cationic Amines', type: 'Cell Penetration', desc: 'Highly positive charge helps breach cell membranes, but can be toxic.', baseValue: 10, icon: Plus },
+              { id: 'none', name: 'Bare (No Modification)', type: 'Passive', desc: 'Relies solely on the physical properties of the core and coating.', baseValue: 0, icon: CircleSlash },
+              { id: 'cpps', name: 'Cell-Penetrating Peptides', type: 'Cell Penetration', desc: 'Short peptide sequences (like TAT) that smoothly cross lipid bilayers.', baseValue: 20, icon: Dna },
+              { id: 'aptamers', name: 'Aptamers', type: 'Targeting', desc: '"Chemical antibodies" made of folded DNA/RNA. Highly stable and specific.', baseValue: 25, icon: Key },
+              { id: 'fluorophores', name: 'Fluorophores', type: 'Imaging', desc: 'Fluorescent dyes attached to the surface for in-vitro/in-vivo optical tracking.', baseValue: 10, icon: Sparkles },
+            ]
+          }
+        ];
+
+        // --- APP COMPONENT ---
+        function App() {
+          const [currentStep, setCurrentStep] = useState(-1);
+          const [selections, setSelections] = useState({
+            material: null,
+            synthesis: null,
+            polymer: null,
+            functionalization: null
+          });
+
+          const handleSelect = (categoryId, optionId) => {
+            setSelections(prev => ({ ...prev, [categoryId]: optionId }));
+          };
+
+          const nextStep = () => setCurrentStep(prev => prev + 1);
+          const prevStep = () => setCurrentStep(prev => prev - 1);
+          const resetApp = () => {
+            setSelections({ material: null, synthesis: null, polymer: null, functionalization: null });
+            setCurrentStep(-1);
+          };
+
+          return (
+            <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-indigo-200">
+              
+              <header className="bg-indigo-900 text-white shadow-lg sticky top-0 z-50">
+                <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Microscope className="text-indigo-400" size={28} />
+                    <h1 className="text-2xl font-black tracking-wide">NANO<span className="text-indigo-400">CRAFT</span></h1>
+                  </div>
+                  {currentStep >= 0 && currentStep < CATEGORIES.length && (
+                    <div className="text-sm font-semibold bg-indigo-800/50 px-4 py-1.5 rounded-full border border-indigo-700">
+                      Phase {currentStep + 1} of {CATEGORIES.length}
+                    </div>
+                  )}
+                </div>
+              </header>
+
+              <main className="max-w-6xl mx-auto px-4 py-8 md:py-12">
+                {currentStep === -1 && <IntroScreen onStart={nextStep} />}
+                
+                {currentStep >= 0 && currentStep < CATEGORIES.length && (
+                  <SelectionScreen 
+                    category={CATEGORIES[currentStep]} 
+                    selectedValue={selections[CATEGORIES[currentStep].id]}
+                    onSelect={handleSelect}
+                    onNext={nextStep}
+                    onPrev={prevStep}
+                    onReset={resetApp}
+                    isFirst={currentStep === 0}
+                  />
+                )}
+
+                {currentStep === CATEGORIES.length && (
+                  <AnalysisScreen selections={selections} onReset={resetApp} />
+                )}
+              </main>
+            </div>
+          );
+        }
+
+        // --- SCREENS ---
+        function IntroScreen({ onStart }) {
+          return (
+            <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in duration-500 max-w-2xl mx-auto">
+              <div className="w-24 h-24 bg-indigo-100 rounded-3xl rotate-12 flex items-center justify-center mb-8 shadow-inner border-4 border-white">
+                <FlaskConical size={48} className="text-indigo-600 -rotate-12" />
+              </div>
+              <h2 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">
+                Nanomaterial <span className="text-indigo-600">Synthesis Lab</span>
+              </h2>
+              <p className="text-lg text-slate-600 mb-10 leading-relaxed">
+                Welcome to the lab! Your mission is to engineer a highly effective nanoparticle for medical applications. 
+                You will choose the core material, synthesis route, polymer coating, and surface functionalization. 
+                <br/><br/>
+                <strong>Warning:</strong> Not all materials play nicely together. Choose synergistic combinations to maximize your Nano-Score, and avoid incompatible pairings that lead to toxicity or destruction of your particle!
+              </p>
+              <button 
+                onClick={onStart}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-bold text-lg flex items-center gap-3 transition-transform hover:scale-105 shadow-xl shadow-indigo-200"
+              >
+                Enter the Lab <ArrowRight size={20} />
+              </button>
+            </div>
+          );
+        }
+
+        function SelectionScreen({ category, selectedValue, onSelect, onNext, onPrev, onReset, isFirst }) {
+          const Icon = category.icon;
+
+          return (
+            <div className="animate-in fade-in duration-500">
+              
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 md:p-10 mb-6">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100">
+                  <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl">
+                    <Icon size={32} />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold text-slate-900">{category.title}</h2>
+                    <p className="text-slate-500 mt-1">{category.description}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {category.options.map((option) => {
+                    const isSelected = selectedValue === option.id;
+                    const OptionIcon = option.icon;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => onSelect(category.id, option.id)}
+                        className={`text-left p-6 rounded-2xl border-2 transition-all duration-200 relative overflow-hidden group flex flex-col justify-between min-h-[220px]
+                          ${isSelected 
+                            ? 'border-indigo-600 bg-indigo-50 shadow-md ring-2 ring-indigo-600 ring-opacity-20' 
+                            : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                          }`}
+                      >
+                        <div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2.5 rounded-xl flex-shrink-0 transition-colors ${isSelected ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
+                                <OptionIcon size={24} />
+                              </div>
+                              <div>
+                                <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-0.5 block line-clamp-1">
+                                  {option.type}
+                                </span>
+                                <h3 className={`text-lg font-bold leading-tight ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                  {option.name}
+                                </h3>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <div className="bg-indigo-600 text-white rounded-full p-1 animate-in zoom-in flex-shrink-0 ml-2">
+                                <Check size={16} />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-slate-600 text-sm leading-relaxed mb-4">{option.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center max-w-6xl mx-auto px-2">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <button 
+                    onClick={onReset}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-rose-500 hover:bg-rose-50 transition-colors"
+                    title="Start Over"
+                  >
+                    <Home size={20} /> <span className="hidden sm:inline">Start Over</span>
+                  </button>
+                  
+                  {!isFirst && (
+                    <button 
+                      onClick={onPrev}
+                      className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
+                    >
+                      <ChevronLeft size={20} /> <span className="hidden sm:inline">Back</span>
+                    </button>
+                  )}
+                </div>
+                
+                <button 
+                  onClick={onNext}
+                  disabled={!selectedValue}
+                  className="flex items-center gap-2 px-6 sm:px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-md"
+                >
+                  <span className="hidden sm:inline">Confirm Selection</span>
+                  <span className="sm:hidden">Confirm</span> 
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        function AnalysisScreen({ selections, onReset }) {
+          const [particleName, setParticleName] = useState('');
+          const [isGenerating, setIsGenerating] = useState(false);
+          const [imageUrl, setImageUrl] = useState(null);
+          const [imageError, setImageError] = useState(false);
+          
+          const evaluateNanomaterial = () => {
+            let baseScore = 0;
+            let interactions = [];
+            
+            const getOpt = (catId, optId) => CATEGORIES.find(c => c.id === catId).options.find(o => o.id === optId);
+            
+            const mat = getOpt('material', selections.material);
+            const syn = getOpt('synthesis', selections.synthesis);
+            const poly = getOpt('polymer', selections.polymer);
+            const func = getOpt('functionalization', selections.functionalization);
+
+            baseScore = mat.baseValue + syn.baseValue + poly.baseValue + func.baseValue;
+
+            // 1. Organic Core + Top-Down Milling (Destruction)
+            if ((mat.id === 'liposome' || mat.id === 'chitosan_np') && syn.id === 'milling') {
+              interactions.push({ type: 'penalty', val: -25, title: 'Structural Destruction', desc: 'High-energy milling applies severe mechanical stress, completely destroying fragile organic structures like liposomes or soft polymers.' });
+            }
+            
+            // 2. Iron Oxide + Co-precipitation (Perfect Match)
+            if (mat.id === 'iron_oxide' && syn.id === 'precipitation') {
+              interactions.push({ type: 'synergy', val: +15, title: 'Ideal Synthesis', desc: 'Co-precipitation is the gold standard for producing highly magnetic, uniform iron oxide nanoparticles (SPIONs).' });
+            }
+
+            // 3. Liposome + Self Assembly OR Microfluidics
+            if (mat.id === 'liposome') {
+              if (syn.id === 'self_assembly') interactions.push({ type: 'synergy', val: +15, title: 'Thermodynamic Stability', desc: 'Lipids naturally self-assemble into spherical liposomes in aqueous solutions, resulting in a highly stable structure.' });
+              if (syn.id === 'microfluidics') interactions.push({ type: 'synergy', val: +25, title: 'Ultra-High Yield & Precision', desc: 'Microfluidics generates extraordinarily uniform liposomes with nearly 100% encapsulation efficiency.' });
+            }
+
+            // 4. Any + PEG + Antibodies/Aptamers (The "Magic Bullet")
+            if (poly.id === 'peg' && (func.id === 'antibodies' || func.id === 'aptamers')) {
+              interactions.push({ type: 'synergy', val: +20, title: 'Stealth & Target Combo', desc: 'PEG hides the particle from the immune system, giving the targeting ligands enough time to find and bind to the specific tumor receptors.' });
+            }
+
+            // 5. Bare Core + Antibodies/Aptamers/Enzymes (Denaturation)
+            if (poly.id === 'none' && (func.id === 'antibodies' || func.id === 'cpps' || func.id === 'aptamers')) {
+              interactions.push({ type: 'penalty', val: -20, title: 'Biological Denaturation', desc: 'Attaching delicate biological molecules directly to a bare, uncoated core often causes them to unfold and lose their targeting ability.' });
+            }
+
+            // 6. Cationic Amines Toxicity
+            if (func.id === 'cationic_amines') {
+              if (poly.id === 'peg' || poly.id === 'dextran') {
+                interactions.push({ type: 'synergy', val: +10, title: 'Shielded Charge', desc: 'The polymer partially shields the highly positive amines, allowing cell penetration without causing severe cell membrane rupture.' });
+              } else {
+                interactions.push({ type: 'penalty', val: -20, title: 'High Cytotoxicity', desc: 'Exposed cationic (positive) amines severely disrupt negatively charged cell membranes, causing unwanted cell death (toxicity).' });
+              }
+            }
+
+            // 7. Albumin + Biomimicry
+            if (poly.id === 'albumin' && mat.id !== 'liposome') {
+               interactions.push({ type: 'synergy', val: +10, title: 'Biomimicry', desc: 'Coating with albumin disguises the nanoparticle as a natural blood component, leveraging natural transport pathways (like SPARC receptors).' });
+            }
+
+            // 8. Mesoporous Silica + Doxorubicin (Massive Loading)
+            if (mat.id === 'mesoporous_silica' && func.id === 'doxorubicin') {
+               interactions.push({ type: 'synergy', val: +20, title: 'Massive Cargo Capacity', desc: 'The honeycomb-like porous structure of mesoporous silica acts as an incredible sponge, soaking up massive amounts of Doxorubicin.' });
+            }
+
+            // 9. Carbon Nanotubes + Hydrophobic Issues
+            if (mat.id === 'carbon_nanotubes' && poly.id === 'none') {
+               interactions.push({ type: 'penalty', val: -15, title: 'Hydrophobic Aggregation', desc: 'Pristine carbon nanotubes are extremely hydrophobic. Without a polymer coating, they rapidly clump together and precipitate out of the blood.' });
+            }
+
+            // 10. Hyaluronic Acid Dual Targeting
+            if (poly.id === 'hyaluronic_acid' && func.id === 'antibodies') {
+               interactions.push({ type: 'synergy', val: +15, title: 'Dual Receptor Targeting', desc: 'Hyaluronic acid inherently targets CD44 tumor receptors, and antibodies add a second layer of targeting, resulting in unmatched accumulation in the tumor.' });
+            }
+
+            // 11. Green Synthesis + Gold/Silver
+            if (syn.id === 'green_synthesis' && mat.id === 'gold_np') {
+               interactions.push({ type: 'synergy', val: +10, title: 'Zero-Toxic Byproducts', desc: 'Using plant extracts to reduce gold ions creates completely biocompatible nanoparticles without harsh chemical reducing agents.' });
+            }
+
+            const interactionTotal = interactions.reduce((sum, int) => sum + int.val, 0);
+            const finalScore = baseScore + interactionTotal;
+
+            return { mat, syn, poly, func, baseScore, interactions, finalScore };
+          };
+
+          const results = evaluateNanomaterial();
+
+          const generateImage = async () => {
+            if (!particleName.trim()) return;
+            setIsGenerating(true);
+            setImageUrl(null);
+            setImageError(false);
+            
+            const apiKey = ""; // API Key provided dynamically in Canvas
+            const promptText = `A stunning, highly detailed 3D rendering of a microscopic nanoparticle named "${particleName}". The core is made of ${results.mat.name}, it has a ${results.poly.name} coating, and is functionalized with ${results.func.name}. Cinematic lighting, glowing edges, abstract colorful random background, scientific illustration, vibrant colors, macro photography, 8k resolution.`;
+
+            try {
+              const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  instances: { prompt: promptText },
+                  parameters: { sampleCount: 1 }
+                })
+              });
+              const data = await response.json();
+              if (data.predictions && data.predictions[0]) {
+                setImageUrl(`data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`);
+              } else {
+                setImageError(true);
+              }
+            } catch (error) {
+              console.error("Image generation failed:", error);
+              setImageError(true);
+            } finally {
+              setIsGenerating(false);
+            }
+          };
+
+          let grade = { label: 'Highly Toxic / Destroyed', color: 'text-red-700 bg-red-100 border-red-400' };
+          if (results.finalScore >= 80) grade = { label: 'Clinical Grade (FDA Approved)', color: 'text-emerald-700 bg-emerald-100 border-emerald-300' };
+          else if (results.finalScore >= 55) grade = { label: 'Viable Lab Prototype', color: 'text-indigo-700 bg-indigo-100 border-indigo-300' };
+          else if (results.finalScore >= 30) grade = { label: 'Unstable System', color: 'text-amber-700 bg-amber-100 border-amber-300' };
+          else if (results.finalScore >= 0) grade = { label: 'Failed Formulation', color: 'text-rose-600 bg-rose-100 border-rose-200' };
+
+          const minScale = -20;
+          const maxScale = 140;
+          const pointerPosition = Math.max(0, Math.min(100, ((results.finalScore - minScale) / (maxScale - minScale)) * 100));
+
+          return (
+            <div className="max-w-5xl mx-auto animate-in fade-in duration-500 space-y-6">
+              
+              <div className="bg-white rounded-3xl p-8 shadow-lg border border-slate-200 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-indigo-600"></div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+                  <div className="lg:col-span-1 flex flex-col items-center text-center border-b lg:border-b-0 lg:border-r border-slate-200 pb-8 lg:pb-0">
+                    <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">Synthesized Particle</h3>
+                    <div className="w-56 h-56 bg-slate-50 rounded-full border-4 border-slate-100 flex items-center justify-center shadow-inner relative overflow-visible">
+                      <NanoparticleGraphic mat={results.mat} poly={results.poly} func={results.func} />
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-2 flex flex-col items-center justify-center gap-6 w-full px-4">
+                    <div className="text-center w-full max-w-sm">
+                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Total Nano-Score</p>
+                      <div className="text-7xl md:text-8xl font-black text-indigo-600 leading-none drop-shadow-sm">{results.finalScore}</div>
+                      
+                      {/* Gradient Scale Bar */}
+                      <div className="relative w-full mt-8 mb-2">
+                        <div className="h-3 rounded-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 w-full shadow-inner border border-slate-200/50"></div>
+                        
+                        {/* Pointer Indicator */}
+                        <div 
+                          className="absolute -top-4 -translate-x-1/2 transition-all duration-1000 ease-out z-10"
+                          style={{ left: `${pointerPosition}%` }}
+                        >
+                          <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[12px] border-l-transparent border-r-transparent border-t-slate-800 drop-shadow-sm"></div>
+                        </div>
+                        
+                        {/* Scale Labels */}
+                        <div className="flex justify-between text-xs font-bold text-slate-400 mt-2 px-1">
+                          <span>-20</span>
+                          <span>60</span>
+                          <span>140</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="w-24 h-px bg-slate-200"></div>
+                    
+                    <div className="text-center flex flex-col items-center">
+                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Classification</p>
+                      <div className={`px-6 py-2 rounded-2xl border-2 font-bold shadow-sm ${grade.color}`}>
+                        {grade.label}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200">
+                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <Layers className="text-indigo-500" size={20}/> Component Breakdown
+                  </h3>
+                  <div className="space-y-4">
+                    <RecipeRow title="Core Material" item={results.mat} />
+                    <RecipeRow title="Synthesis Route" item={results.syn} />
+                    <RecipeRow title="Polymer Coating" item={results.poly} />
+                    <RecipeRow title="Functionalization" item={results.func} />
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200">
+                  <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <ShieldAlert className="text-indigo-500" size={20}/> Chemical Interactions
+                  </h3>
+                  
+                  {results.interactions.length === 0 ? (
+                    <div className="h-48 flex flex-col items-center justify-center text-slate-400 text-center px-4">
+                      <FlaskConical size={40} className="mb-3 opacity-20" />
+                      <p>No major synergies or penalties detected. The formulation acts exactly as the sum of its parts.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
+                      {results.interactions.map((interaction, idx) => (
+                        <div key={idx} className={`p-4 rounded-xl border-l-4 ${
+                          interaction.type === 'synergy' 
+                            ? 'bg-emerald-50 border-emerald-500' 
+                            : 'bg-rose-50 border-rose-500'
+                        }`}>
+                          <div className="flex justify-between items-start mb-1">
+                            <h4 className={`font-bold flex items-center gap-2 ${interaction.type === 'synergy' ? 'text-emerald-800' : 'text-rose-800'}`}>
+                              {interaction.type === 'synergy' ? <Sparkles size={16}/> : <AlertTriangle size={16}/>}
+                              {interaction.title}
+                            </h4>
+                            <span className={`font-bold font-mono ${interaction.type === 'synergy' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {interaction.val > 0 ? `+${interaction.val}` : interaction.val}
+                            </span>
+                          </div>
+                          <p className={`text-sm leading-relaxed ${interaction.type === 'synergy' ? 'text-emerald-700/80' : 'text-rose-700/80'}`}>
+                            {interaction.desc}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* AI Imaging Lab Section */}
+              <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                  <Camera className="text-indigo-500" size={20}/> Nano-Imaging Lab
+                </h3>
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex-1 space-y-4 w-full">
+                    <p className="text-slate-600 text-sm">
+                      Give your new formulation a distinct name. Once named, our AI-powered electron microscope will generate a high-resolution visual representation of your particle.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input 
+                        type="text" 
+                        placeholder="e.g. LipoDox-9000"
+                        value={particleName}
+                        onChange={(e) => setParticleName(e.target.value)}
+                        className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:ring-0 outline-none transition-colors font-medium text-slate-800"
+                        disabled={isGenerating}
+                      />
+                      <button 
+                        onClick={generateImage}
+                        disabled={!particleName.trim() || isGenerating}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                        {isGenerating ? 'Imaging...' : 'Generate Image'}
+                      </button>
+                    </div>
+                    {imageError && (
+                      <p className="text-rose-500 text-sm font-medium flex items-center gap-1">
+                        <AlertTriangle size={14} /> Image generation failed. Ensure your API key is provided in the environment.
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="w-full md:w-64 h-64 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden relative flex-shrink-0">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={particleName} className="w-full h-full object-cover animate-in fade-in zoom-in duration-500" />
+                    ) : isGenerating ? (
+                      <div className="flex flex-col items-center text-indigo-400 animate-pulse">
+                        <Loader2 size={32} className="animate-spin mb-2" />
+                        <span className="text-sm font-bold uppercase tracking-widest">Scanning...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center text-slate-400">
+                        <ImageIcon size={32} className="mb-2 opacity-50" />
+                        <span className="text-sm font-medium">No image generated</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center pt-4 pb-8">
+                <button 
+                  onClick={onReset}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold flex items-center gap-2 transition-transform hover:scale-105 shadow-xl"
+                >
+                  <RefreshCcw size={18} /> Synthesize Another Batch
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        // --- DYNAMIC NANOPARTICLE GRAPHIC ---
+        function NanoparticleGraphic({ mat, poly, func }) {
+          return (
+            <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-md animate-in zoom-in duration-1000" style={{ animationName: 'zoomIn, spin', animationDuration: '1s, 20s', animationIterationCount: '1, infinite', animationTimingFunction: 'ease-out, linear' }}>
+              <g transform="translate(100, 100)">
+                
+                {/* 1. Core Material */}
+                {mat.id === 'gold_np' && <circle r="35" fill="#fbbf24" stroke="#d97706" strokeWidth="2" />}
+                {mat.id === 'iron_oxide' && <circle r="35" fill="#475569" stroke="#1e293b" strokeWidth="2" />}
+                {mat.id === 'chitosan_np' && <circle r="35" fill="#a3e635" stroke="#65a30d" strokeWidth="2" />}
+                {mat.id === 'quantum_dots' && (
+                   <circle r="25" fill="#22d3ee" className="drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                )}
+                {mat.id === 'carbon_nanotubes' && (
+                  <g transform="rotate(30)">
+                    <rect x="-15" y="-45" width="30" height="90" rx="8" fill="#334155" />
+                    <line x1="-5" y1="-45" x2="-5" y2="45" stroke="#1e293b" strokeWidth="2" />
+                    <line x1="5" y1="-45" x2="5" y2="45" stroke="#1e293b" strokeWidth="2" />
+                  </g>
+                )}
+                {mat.id === 'mesoporous_silica' && (
+                  <g>
+                    <circle r="35" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="2" />
+                    {Array.from({length: 20}).map((_, i) => (
+                      <circle key={`pore-${i}`} cx={25 * Math.cos(i * Math.PI / 3.5)} cy={25 * Math.sin(i * Math.PI / 3.5)} r="4" fill="#94a3b8" />
+                    ))}
+                  </g>
+                )}
+                {mat.id === 'liposome' && (
+                  <>
+                    <circle r="35" fill="#e0f2fe" />
+                    <circle r="35" fill="none" stroke="#38bdf8" strokeWidth="6" />
+                    <circle r="22" fill="none" stroke="#7dd3fc" strokeWidth="3" />
+                  </>
+                )}
+
+                {/* 2. Doxorubicin (Therapeutic - embedded inside core) */}
+                {func.id === 'doxorubicin' && (
+                   Array.from({length: 8}).map((_, i) => {
+                    const r = (mat.id === 'liposome' || mat.id === 'mesoporous_silica') ? 15 : 22; 
+                    const cx = r * Math.cos(i * Math.PI / 4);
+                    const cy = r * Math.sin(i * Math.PI / 4);
+                    return <polygon key={`dox-${i}`} points={`${cx},${cy-4} ${cx+4},${cy+2} ${cx+2},${cy+6} ${cx-2},${cy+6} ${cx-4},${cy+2}`} fill="#ef4444" />
+                  })
+                )}
+
+                {/* 3. Polymer Coating */}
+                {poly.id === 'albumin' && (
+                  Array.from({length: 16}).map((_, i) => (
+                    <circle key={`alb-${i}`} cx={42 * Math.cos(i * Math.PI / 8)} cy={42 * Math.sin(i * Math.PI / 8)} r="12" fill="#fca5a5" opacity="0.8" />
+                  ))
+                )}
+                {poly.id === 'lipids' && (
+                  <circle r="44" fill="none" stroke="#60a5fa" strokeDasharray="8 4" strokeWidth="8" opacity="0.9" />
+                )}
+                {poly.id === 'peg' && (
+                   Array.from({length: 30}).map((_, i) => (
+                    <path key={`peg-${i}`} d={`M ${38 * Math.cos(i * Math.PI / 15)} ${38 * Math.sin(i * Math.PI / 15)} L ${60 * Math.cos(i * Math.PI / 15 + 0.1)} ${60 * Math.sin(i * Math.PI / 15 + 0.1)}`} stroke="#c084fc" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+                  ))
+                )}
+                {poly.id === 'hyaluronic_acid' && (
+                   Array.from({length: 24}).map((_, i) => (
+                    <path key={`ha-${i}`} d={`M ${38 * Math.cos(i * Math.PI / 12)} ${38 * Math.sin(i * Math.PI / 12)} Q ${50 * Math.cos(i * Math.PI / 12 + 0.2)} ${50 * Math.sin(i * Math.PI / 12 + 0.2)} ${62 * Math.cos(i * Math.PI / 12)} ${62 * Math.sin(i * Math.PI / 12)}`} fill="none" stroke="#84cc16" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+                  ))
+                )}
+                {poly.id === 'plga' && (
+                  <circle r="43" fill="none" stroke="#34d399" strokeWidth="12" opacity="0.6" />
+                )}
+                {poly.id === 'dextran' && (
+                  <circle r="44" fill="none" stroke="#d97706" strokeDasharray="6 6" strokeWidth="8" opacity="0.8" />
+                )}
+                {poly.id === 'calcium_phosphate' && (
+                  <path d={Array.from({length: 24}).map((_, i) => {
+                    const r = i % 2 === 0 ? 48 : 40;
+                    const angle = i * Math.PI / 12;
+                    return `${i === 0 ? 'M' : 'L'} ${r * Math.cos(angle)} ${r * Math.sin(angle)}`;
+                  }).join(' ') + ' Z'} fill="none" stroke="#94a3b8" strokeWidth="6" opacity="0.9" />
+                )}
+
+                {/* 4. Functionalization (Surface) */}
+                {func.id === 'antibodies' && (
+                  Array.from({length: 8}).map((_, i) => {
+                    const angleDeg = i * 45;
+                    return (
+                      <g key={`ab-${i}`} transform={`rotate(${angleDeg})`}>
+                        <path d="M 0 -48 L 0 -68 M 0 -68 L -10 -80 M 0 -68 L 10 -80" stroke="#ec4899" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </g>
+                    )
+                  })
+                )}
+                {func.id === 'cpps' && (
+                  Array.from({length: 12}).map((_, i) => {
+                    const angleDeg = i * 30;
+                    return (
+                      <g key={`cpp-${i}`} transform={`rotate(${angleDeg})`}>
+                        <path d="M 0 -45 Q 8 -55 0 -65 T 6 -78" stroke="#10b981" strokeWidth="3" fill="none" strokeLinecap="round" />
+                      </g>
+                    )
+                  })
+                )}
+                {func.id === 'aptamers' && (
+                  Array.from({length: 10}).map((_, i) => {
+                    const angleDeg = i * 36;
+                    return (
+                      <g key={`apt-${i}`} transform={`rotate(${angleDeg})`}>
+                         <polygon points="0,-48 -6,-65 6,-65" fill="#f43f5e" />
+                      </g>
+                    )
+                  })
+                )}
+                {func.id === 'fluorophores' && (
+                   Array.from({length: 16}).map((_, i) => {
+                    const r = 52;
+                    const cx = r * Math.cos(i * Math.PI / 8);
+                    const cy = r * Math.sin(i * Math.PI / 8);
+                    return <circle key={`fluor-${i}`} cx={cx} cy={cy} r="3" fill="#fbbf24" className="drop-shadow-[0_0_4px_rgba(251,191,36,1)]" />
+                  })
+                )}
+                {func.id === 'cationic_amines' && (
+                   Array.from({length: 12}).map((_, i) => {
+                    const angleDeg = i * 30;
+                    return (
+                      <g key={`cat-${i}`} transform={`rotate(${angleDeg})`}>
+                        <text x="0" y="-55" fill="#16a34a" fontSize="26" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">+</text>
+                      </g>
+                    )
+                  })
+                )}
+
+              </g>
+            </svg>
+          );
+        }
+
+        function RecipeRow({ title, item }) {
+          const Icon = item.icon;
+          return (
+            <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100 text-indigo-500">
+                  <Icon size={18} />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</div>
+                  <div className="font-semibold text-slate-800">{item.name}</div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
