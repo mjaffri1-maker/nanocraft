@@ -304,6 +304,7 @@
 
         function AnalysisScreen({ selections, onReset }) {
           const [particleName, setParticleName] = useState('');
+          const [userApiKey, setUserApiKey] = useState('');
           const [isGenerating, setIsGenerating] = useState(false);
           const [imageUrl, setImageUrl] = useState(null);
           const [imageError, setImageError] = useState(false);
@@ -395,7 +396,7 @@
             setImageUrl(null);
             setImageError(false);
             
-            const apiKey = ""; // API Key provided dynamically in Canvas
+            const apiKey = userApiKey || ""; // Uses user key on GitHub, or Canvas injected key
             const promptText = `A stunning, highly detailed 3D rendering of a microscopic nanoparticle named "${particleName}". The core is made of ${results.mat.name}, it has a ${results.poly.name} coating, and is functionalized with ${results.func.name}. Cinematic lighting, glowing edges, abstract colorful random background, scientific illustration, vibrant colors, macro photography, 8k resolution.`;
 
             try {
@@ -544,27 +545,37 @@
                     <p className="text-slate-600 text-sm">
                       Give your new formulation a distinct name. Once named, our AI-powered electron microscope will generate a high-resolution visual representation of your particle.
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex flex-col gap-3">
                       <input 
-                        type="text" 
-                        placeholder="e.g. LipoDox-9000"
-                        value={particleName}
-                        onChange={(e) => setParticleName(e.target.value)}
-                        className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:ring-0 outline-none transition-colors font-medium text-slate-800"
+                        type="password" 
+                        placeholder="Gemini API Key (Required if testing on GitHub Pages)"
+                        value={userApiKey}
+                        onChange={(e) => setUserApiKey(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:ring-0 outline-none transition-colors font-medium text-slate-800 text-sm"
                         disabled={isGenerating}
                       />
-                      <button 
-                        onClick={generateImage}
-                        disabled={!particleName.trim() || isGenerating}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
-                      >
-                        {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                        {isGenerating ? 'Imaging...' : 'Generate Image'}
-                      </button>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input 
+                          type="text" 
+                          placeholder="e.g. LipoDox-9000"
+                          value={particleName}
+                          onChange={(e) => setParticleName(e.target.value)}
+                          className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:ring-0 outline-none transition-colors font-medium text-slate-800"
+                          disabled={isGenerating}
+                        />
+                        <button 
+                          onClick={generateImage}
+                          disabled={!particleName.trim() || isGenerating}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
+                        >
+                          {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                          {isGenerating ? 'Imaging...' : 'Generate Image'}
+                        </button>
+                      </div>
                     </div>
                     {imageError && (
                       <p className="text-rose-500 text-sm font-medium flex items-center gap-1">
-                        <AlertTriangle size={14} /> Image generation failed. Ensure your API key is provided in the environment.
+                        <AlertTriangle size={14} /> Image generation failed. Ensure your API key is correct.
                       </p>
                     )}
                   </div>
